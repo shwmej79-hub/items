@@ -10,6 +10,8 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <!-- SheetJS (xlsx) for Excel Import/Export -->
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <!-- Supabase JS Client v2 -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <!-- FontAwesome Icons -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -31,6 +33,9 @@
 </head>
 <body class="bg-slate-50 text-slate-800 antialiased min-h-screen flex flex-col">
 
+  <!-- Top Notification Toast -->
+  <div id="toastContainer" class="fixed top-5 right-5 z-50 flex flex-col space-y-2 pointer-events-none"></div>
+
   <!-- Top Navigation Bar -->
   <header class="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-sm">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -40,25 +45,38 @@
             <i class="fa-solid fa-boxes-stacked text-lg"></i>
           </div>
           <div>
-            <h1 class="text-lg font-bold text-slate-900 tracking-tight flex items-center gap-2">
-              기업 자산 및 비품 관리대장
-              <span class="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200">v2.0 Pro</span>
-            </h1>
-            <p class="text-xs text-slate-500">고정자산 · IT장비 · 사무비품 통합 전산관리</p>
+            <div class="flex items-center gap-2">
+              <h1 class="text-lg font-bold text-slate-900 tracking-tight">
+                기업 자산 및 비품 관리대장
+              </h1>
+              <span class="text-xs font-semibold px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200">v2.1 Cloud</span>
+            </div>
+            <p class="text-xs text-slate-500">고정자산 · IT장비 · 사무비품 클라우드 데이터베이스 전산관리</p>
           </div>
         </div>
 
         <!-- Global Action Buttons -->
         <div class="flex items-center space-x-2 sm:space-x-3">
+          <!-- Supabase Connection Status Button -->
+          <button id="btnOpenSupabaseModal" class="inline-flex items-center px-3 py-1.5 border border-slate-300 text-xs sm:text-sm font-semibold rounded-lg transition shadow-sm bg-white hover:bg-slate-50">
+            <span id="supabaseStatusDot" class="w-2.5 h-2.5 rounded-full bg-slate-400 mr-2"></span>
+            <span id="supabaseStatusText" class="text-slate-700">DB 연동 설정</span>
+          </button>
+
+          <!-- Excel Export -->
           <button id="btnExcelExport" class="inline-flex items-center px-3.5 py-2 border border-emerald-600 text-xs sm:text-sm font-semibold rounded-lg text-emerald-700 bg-emerald-50 hover:bg-emerald-100 transition shadow-sm">
             <i class="fa-solid fa-file-excel mr-1.5 text-emerald-600 text-base"></i>
             엑셀 내보내기
           </button>
+
+          <!-- Excel Import -->
           <label for="excelFileInput" class="cursor-pointer inline-flex items-center px-3.5 py-2 border border-slate-300 text-xs sm:text-sm font-medium rounded-lg text-slate-700 bg-white hover:bg-slate-50 transition shadow-sm">
             <i class="fa-solid fa-file-import mr-1.5 text-slate-500"></i>
             엑셀 불러오기
             <input type="file" id="excelFileInput" accept=".xlsx, .xls, .csv" class="hidden">
           </label>
+
+          <!-- New Asset Button -->
           <button id="btnOpenAddModal" class="inline-flex items-center px-4 py-2 border border-transparent text-xs sm:text-sm font-semibold rounded-lg text-white bg-indigo-600 hover:bg-indigo-700 transition shadow-md shadow-indigo-100">
             <i class="fa-solid fa-plus mr-1.5"></i>
             신규 자산 등록
@@ -67,6 +85,17 @@
       </div>
     </div>
   </header>
+
+  <!-- Database Mode Banner (Shown when connected to Supabase) -->
+  <div id="dbModeBanner" class="bg-indigo-50 border-b border-indigo-100 px-4 py-2 text-xs text-indigo-900 flex items-center justify-between max-w-7xl mx-auto w-full">
+    <div class="flex items-center gap-2">
+      <i class="fa-solid fa-database text-indigo-600"></i>
+      <span id="bannerText">현재 <strong>로컬 브라우저 저장소(LocalStorage)</strong> 모드로 동작 중입니다. Supabase 연동 시 실시간 클라우드 DB로 전환됩니다.</span>
+    </div>
+    <button id="btnBannerAction" class="font-semibold underline hover:text-indigo-700 text-xs ml-2 whitespace-nowrap">
+      수퍼베이스 설정하기
+    </button>
+  </div>
 
   <!-- Main Content Container -->
   <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
@@ -210,6 +239,11 @@
               <option value="폐기">폐기</option>
             </select>
 
+            <!-- Refresh Button -->
+            <button id="btnRefreshData" title="데이터 새로고침" class="p-2 border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-100 transition">
+              <i class="fa-solid fa-arrows-rotate"></i>
+            </button>
+
             <!-- Batch Delete Button (Hidden by default) -->
             <button id="btnBatchDelete" class="hidden inline-flex items-center px-3 py-2 border border-rose-300 text-xs sm:text-sm font-semibold rounded-lg text-rose-700 bg-rose-50 hover:bg-rose-100 transition">
               <i class="fa-solid fa-trash-can mr-1.5"></i>
@@ -225,7 +259,15 @@
       </div>
 
       <!-- Table View -->
-      <div class="overflow-x-auto custom-scrollbar">
+      <div class="overflow-x-auto custom-scrollbar relative">
+        <!-- Loading Overlay -->
+        <div id="tableLoading" class="absolute inset-0 bg-white/70 backdrop-blur-[1px] flex items-center justify-center z-10 hidden">
+          <div class="flex items-center gap-2 text-indigo-600 font-semibold text-sm">
+            <i class="fa-solid fa-spinner fa-spin text-lg"></i>
+            <span>데이터 동기화 중...</span>
+          </div>
+        </div>
+
         <table class="w-full text-left border-collapse text-sm">
           <thead>
             <tr class="bg-slate-100/70 border-b border-slate-200 text-slate-600 font-semibold text-xs tracking-wider">
@@ -257,7 +299,7 @@
         </table>
       </div>
 
-      <!-- Empty State / Pagination Info -->
+      <!-- Empty State -->
       <div id="emptyState" class="hidden py-16 text-center">
         <div class="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mx-auto text-slate-400 text-2xl mb-3">
           <i class="fa-solid fa-inbox"></i>
@@ -265,7 +307,7 @@
         <p class="text-base font-semibold text-slate-700">등록된 자산이 없습니다</p>
         <p class="text-xs text-slate-500 mt-1">새 자산을 등록하거나 샘플 데이터를 불러와보세요.</p>
         <button id="btnLoadSampleEmpty" class="mt-4 px-4 py-2 text-xs font-semibold rounded-lg bg-indigo-50 text-indigo-600 border border-indigo-200 hover:bg-indigo-100">
-          샘플 데이터 10건 채우기
+          샘플 데이터 채우기
         </button>
       </div>
 
@@ -276,7 +318,7 @@
         </div>
         <div class="flex items-center space-x-2">
           <button id="btnLoadSample" class="text-indigo-600 hover:underline">
-            <i class="fa-solid fa-wand-magic-sparkles mr-1"></i>샘플 데이터 복원
+            <i class="fa-solid fa-wand-magic-sparkles mr-1"></i>샘플 데이터 생성
           </button>
           <span>|</span>
           <button id="btnClearAll" class="text-rose-600 hover:underline">
@@ -286,6 +328,87 @@
       </div>
     </section>
   </main>
+
+  <!-- ========================================== -->
+  <!-- Supabase Settings Modal                    -->
+  <!-- ========================================== -->
+  <div id="supabaseModal" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm hidden p-4">
+    <div class="bg-white rounded-2xl max-w-lg w-full shadow-2xl border border-slate-200 overflow-hidden transform transition-all">
+      <div class="px-6 py-4 bg-slate-900 text-white flex justify-between items-center">
+        <div class="flex items-center gap-2">
+          <div class="w-8 h-8 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center font-bold">
+            ⚡
+          </div>
+          <h3 class="text-base font-bold">Supabase 클라우드 DB 연동 설정</h3>
+        </div>
+        <button id="btnCloseSupabaseModal" class="text-slate-400 hover:text-white text-lg">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <div class="p-6 space-y-4">
+        <p class="text-xs text-slate-600 leading-relaxed">
+          Supabase 프로젝트 정보를 입력하시면 브라우저 로컬 저장소가 아닌 <strong>PostgreSQL 클라우드 데이터베이스</strong>에 모든 자산 데이터가 실시간으로 영구 저장됩니다.
+        </p>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 mb-1">
+            Supabase Project URL <span class="text-rose-500">*</span>
+          </label>
+          <input type="url" id="sbProjectUrl" placeholder="https://your-project.supabase.co"
+            class="w-full px-3 py-2 text-xs font-mono border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+          <span class="text-[11px] text-slate-400 mt-1 block">Supabase 대시보드 -> Project Settings -> API -> Project URL</span>
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 mb-1">
+            Supabase Anon Public API Key <span class="text-rose-500">*</span>
+          </label>
+          <input type="password" id="sbAnonKey" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+            class="w-full px-3 py-2 text-xs font-mono border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+          <span class="text-[11px] text-slate-400 mt-1 block">Supabase 대시보드 -> Project Settings -> API -> Project API keys -> anon (public)</span>
+        </div>
+
+        <!-- Schema Helper Alert -->
+        <div class="bg-amber-50 border border-amber-200 rounded-lg p-3 text-xs text-amber-800 space-y-1">
+          <div class="font-semibold flex items-center gap-1.5 text-amber-900">
+            <i class="fa-solid fa-triangle-exclamation"></i> 테이블 생성이 필요하신가요?
+          </div>
+          <p class="text-[11px] text-amber-700">
+            프로젝트 루트 폴더에 준비된 <code class="bg-amber-100 px-1 py-0.5 rounded font-mono">supabase_schema.sql</code> 파일 내용을 Supabase SQL Editor에 복사 후 실행하시면 테이블 및 보안 정책(RLS)이 1초 만에 구성됩니다.
+          </p>
+        </div>
+
+        <!-- Sync Local to Supabase Option -->
+        <div id="syncSection" class="pt-2 border-t border-slate-100 hidden">
+          <div class="flex items-center justify-between">
+            <div>
+              <span class="text-xs font-semibold text-slate-800">로컬 데이터 업로드</span>
+              <p class="text-[11px] text-slate-500">현재 로컬에 저장된 자산 목록을 Supabase로 일괄 전송합니다.</p>
+            </div>
+            <button type="button" id="btnSyncToCloud" class="px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-semibold rounded-lg border border-indigo-200 transition">
+              <i class="fa-solid fa-cloud-arrow-up mr-1"></i>클라우드로 올리기
+            </button>
+          </div>
+        </div>
+
+        <!-- Actions -->
+        <div class="pt-3 border-t border-slate-200 flex items-center justify-between">
+          <button type="button" id="btnDisconnectSb" class="text-xs text-rose-600 hover:underline">
+            연결 해제 (로컬 모드 복귀)
+          </button>
+          <div class="flex space-x-2">
+            <button type="button" id="btnCancelSbModal" class="px-3.5 py-2 border border-slate-300 text-xs font-medium rounded-lg text-slate-700 hover:bg-slate-50">
+              취소
+            </button>
+            <button type="button" id="btnSaveSupabase" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-lg shadow-sm">
+              <i class="fa-solid fa-bolt mr-1"></i>연결 및 저장
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
 
   <!-- Asset Form Modal (Add / Edit) -->
   <div id="assetModal" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm hidden overflow-y-auto p-4">
@@ -390,7 +513,7 @@
             <label class="block text-xs font-semibold text-slate-700 mb-1">
               실사용자 / 담당자
             </label>
-            <input type="text" id="formUser" placeholder="예: 홍길동 (공용인 경우 공용 입력)"
+            <input type="text" id="formUser" placeholder="예: 김민수 수석 (공용인 경우 공용 입력)"
               class="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none">
           </div>
 
@@ -399,7 +522,7 @@
             <label class="block text-xs font-semibold text-slate-700 mb-1">
               보관 및 설치위치
             </label>
-            <input type="text" id="formLocation" placeholder="예: 본사 4층 개발룸 좌석 12"
+            <input type="text" id="formLocation" placeholder="예: 본사 5층 개발실 A-12"
               class="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none">
           </div>
 
@@ -440,7 +563,7 @@
           <button type="button" id="btnCancelModal" class="px-4 py-2 border border-slate-300 text-sm font-medium rounded-lg text-slate-700 hover:bg-slate-50 transition">
             취소
           </button>
-          <button type="submit" class="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-sm font-semibold rounded-lg text-white shadow-md shadow-indigo-100 transition">
+          <button type="submit" id="btnSubmitAsset" class="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-sm font-semibold rounded-lg text-white shadow-md shadow-indigo-100 transition">
             저장하기
           </button>
         </div>
@@ -473,7 +596,7 @@
   <!-- Footer -->
   <footer class="bg-white border-t border-slate-200 py-4 mt-auto">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between text-xs text-slate-400 gap-2">
-      <p>© 기업 고정자산 관리대장 시스템 · 브라우저 로컬 스토리지에 안전하게 자동 저장됩니다.</p>
+      <p id="footerDbStatus">© 기업 고정자산 관리대장 시스템 · 로컬 브라우저 저장소 모드</p>
       <p>단축키: <kbd class="px-1.5 py-0.5 bg-slate-100 border border-slate-300 rounded text-slate-600">Esc</kbd> 창 닫기</p>
     </div>
   </footer>
@@ -495,7 +618,7 @@
         location: "본사 5층 개발실 A-12",
         status: "사용중",
         serial: "C02G99A0MD6R",
-        remarks: "애플케어 플러스 가입 (2027-01 만료)"
+        remarks: "애플케어 플러스 적용 (~2027)"
       },
       {
         id: "ast-2",
@@ -507,10 +630,10 @@
         price: 950000,
         department: "디자인팀",
         user: "이서연 팀장",
-        location: "본사 4층 디자인스튜디오",
+        location: "본사 4층 디자인룸",
         status: "사용중",
         serial: "CN-0R289D-74445",
-        remarks: "듀얼 모니터 구성용"
+        remarks: "듀얼 모니터 구성"
       },
       {
         id: "ast-3",
@@ -521,11 +644,11 @@
         quantity: 5,
         price: 1850000,
         department: "경영지원팀",
-        user: "임원실 및 총무팀",
+        user: "임원실/총무팀",
         location: "본사 6층 임원실",
         status: "사용중",
         serial: "HM-AER-202308",
-        remarks: "12년 본사 보증 품목"
+        remarks: "12년 본사 워런티 보증"
       },
       {
         id: "ast-4",
@@ -540,12 +663,12 @@
         location: "영업본부 외근용",
         status: "수리중",
         serial: "LG15Z90R-GA56K",
-        remarks: "액정 패널 교체 AS 접수 진행 중 (LG서비스센터)"
+        remarks: "액정 패널 AS센터 접수 중"
       },
       {
         id: "ast-5",
         code: "AST-ELC-2023-004",
-        name: "삼성 비스포크 공기청정기 큐브",
+        name: "삼성 비스포크 공기청정기",
         category: "전자제품",
         date: "2023-03-02",
         quantity: 3,
@@ -555,7 +678,7 @@
         location: "대회의실 및 라운지",
         status: "사용중",
         serial: "AX53A9310GGD",
-        remarks: "필터 교체 주기: 매년 4월"
+        remarks: "필터 정기교체(매년 4월)"
       },
       {
         id: "ast-6",
@@ -570,27 +693,27 @@
         location: "지하 1층 창고",
         status: "유휴(보관)",
         serial: "DSK-MD-1600W",
-        remarks: "신규 입사자 배정 대기 중"
+        remarks: "신규 입사자 배정 대기"
       },
       {
         id: "ast-7",
         code: "AST-CAR-2022-001",
-        name: "현대 아이오닉5 전기차 (법인업무용)",
+        name: "현대 아이오닉5 (법인차량)",
         category: "차량운반구",
         date: "2022-06-18",
         quantity: 1,
         price: 54000000,
         department: "경영지원팀",
-        user: "법인 공용 (운행일지 작성)",
-        location: "사옥 지하 2층 전용주차구역",
+        user: "법인 공용",
+        location: "지하 2층 주차장",
         status: "사용중",
         serial: "123가 4567",
-        remarks: "완속충전기 등록 차량, 매년 6월 종합보험 갱신"
+        remarks: "업무운행일지 작성 필수"
       },
       {
         id: "ast-8",
         code: "AST-IT-2021-030",
-        name: "HP 레이저 복합기 MFP-E82660",
+        name: "HP 고속 복합기 MFP-E82660",
         category: "IT기기",
         date: "2021-09-01",
         quantity: 1,
@@ -600,56 +723,282 @@
         location: "본사 4층 복사실",
         status: "사용중",
         serial: "HPE82660-KR003",
-        remarks: "월 렌탈 유지보수 계약 체결"
+        remarks: "월 렌탈 유지보수 계약"
       },
       {
         id: "ast-9",
         code: "AST-IT-2020-011",
-        name: "구형 데스크톱 PC 본체 (i5-8세대)",
+        name: "구형 데스크톱 본체 (i5-8세대)",
         category: "IT기기",
         date: "2020-04-10",
         quantity: 2,
         price: 850000,
         department: "개발팀",
         user: "불용자산",
-        location: "지하 1층 창고 폐기구역",
+        location: "지하 창고 폐기구역",
         status: "폐기예정",
-        serial: "SYS-OLD-2020-01",
-        remarks: "내구연한 경과 및 저장장치 디가우징 후 폐기 진행 예정"
+        serial: "SYS-OLD-2020",
+        remarks: "디가우징 후 폐기 예정"
       }
     ];
 
-    // State
-    const STORAGE_KEY = "COMPANY_ASSET_MANAGER_V2";
+    // ==========================================
+    // State & Constants
+    // ==========================================
+    const LOCAL_STORAGE_KEY = "COMPANY_ASSET_MANAGER_V2";
+    const SUPABASE_CONFIG_KEY = "COMPANY_ASSET_SUPABASE_CONFIG";
+
     let assets = [];
     let currentSort = { column: "date", asc: false };
     let selectedAssetIds = new Set();
     let deptChart = null;
     let categoryChart = null;
+    let supabaseClient = null;
 
-    // Load data from LocalStorage
-    function loadData() {
-      const saved = localStorage.getItem(STORAGE_KEY);
+    // Toast Alert Helper
+    function showToast(message, type = "info") {
+      const container = document.getElementById("toastContainer");
+      const toast = document.createElement("div");
+      const bgColors = {
+        success: "bg-emerald-600 text-white",
+        error: "bg-rose-600 text-white",
+        info: "bg-indigo-600 text-white",
+        warning: "bg-amber-500 text-white"
+      };
+      const icons = {
+        success: "fa-circle-check",
+        error: "fa-circle-xmark",
+        info: "fa-circle-info",
+        warning: "fa-triangle-exclamation"
+      };
+
+      toast.className = `${bgColors[type] || bgColors.info} px-4 py-2.5 rounded-xl shadow-lg text-xs font-semibold flex items-center gap-2 transform transition-all duration-300 translate-y-2 opacity-0 pointer-events-auto`;
+      toast.innerHTML = `<i class="fa-solid ${icons[type] || icons.info}"></i> <span>${message}</span>`;
+      container.appendChild(toast);
+
+      requestAnimationFrame(() => {
+        toast.classList.remove("translate-y-2", "opacity-0");
+      });
+
+      setTimeout(() => {
+        toast.classList.add("opacity-0", "translate-y-2");
+        setTimeout(() => toast.remove(), 300);
+      }, 3500);
+    }
+
+    // Set Loading state
+    function setLoading(isLoading) {
+      const el = document.getElementById("tableLoading");
+      if (isLoading) el.classList.remove("hidden");
+      else el.classList.add("hidden");
+    }
+
+    // ==========================================
+    // Supabase Initialization & Data Layer
+    // ==========================================
+    function initSupabase() {
+      const configStr = localStorage.getItem(SUPABASE_CONFIG_KEY);
+      if (configStr) {
+        try {
+          const config = JSON.parse(configStr);
+          if (config.url && config.key && window.supabase) {
+            supabaseClient = window.supabase.createClient(config.url, config.key);
+            updateDbStatusUI(true, config.url);
+            return true;
+          }
+        } catch (e) {
+          console.error("Failed to init supabase", e);
+        }
+      }
+      supabaseClient = null;
+      updateDbStatusUI(false);
+      return false;
+    }
+
+    function updateDbStatusUI(isConnected, url = "") {
+      const dot = document.getElementById("supabaseStatusDot");
+      const text = document.getElementById("supabaseStatusText");
+      const banner = document.getElementById("dbModeBanner");
+      const bannerText = document.getElementById("bannerText");
+      const footer = document.getElementById("footerDbStatus");
+      const syncSection = document.getElementById("syncSection");
+
+      if (isConnected) {
+        dot.className = "w-2.5 h-2.5 rounded-full bg-emerald-500 mr-2 animate-pulse";
+        text.innerText = "Supabase 연동됨";
+        text.className = "text-emerald-700 font-bold";
+        banner.className = "bg-emerald-50 border-b border-emerald-100 px-4 py-2 text-xs text-emerald-900 flex items-center justify-between max-w-7xl mx-auto w-full";
+        bannerText.innerHTML = `🟢 <strong>Supabase 클라우드 데이터베이스</strong>와 실시간 동기화 중입니다. (${escapeHtml(url)})`;
+        footer.innerText = `© 기업 고정자산 관리대장 시스템 · Supabase Cloud PostgreSQL 연동 중`;
+        syncSection.classList.remove("hidden");
+      } else {
+        dot.className = "w-2.5 h-2.5 rounded-full bg-slate-400 mr-2";
+        text.innerText = "DB 연동 설정";
+        text.className = "text-slate-700";
+        banner.className = "bg-indigo-50 border-b border-indigo-100 px-4 py-2 text-xs text-indigo-900 flex items-center justify-between max-w-7xl mx-auto w-full";
+        bannerText.innerHTML = `<i class="fa-solid fa-database text-indigo-600 mr-1"></i> 현재 <strong>로컬 브라우저 저장소(LocalStorage)</strong> 모드로 동작 중입니다.`;
+        footer.innerText = `© 기업 고정자산 관리대장 시스템 · 로컬 브라우저 저장소 모드`;
+        syncSection.classList.add("hidden");
+      }
+    }
+
+    // Unified Data Load
+    async function loadData() {
+      setLoading(true);
+      try {
+        if (supabaseClient) {
+          // Fetch from Supabase
+          const { data, error } = await supabaseClient
+            .from('assets')
+            .select('*')
+            .order('date', { ascending: false });
+
+          if (error) {
+            console.error("Supabase load error:", error);
+            showToast(`Supabase 조회 실패: ${error.message} (로컬 캐시 사용)`, "warning");
+            loadLocalData();
+          } else {
+            assets = data || [];
+            showToast(`Supabase 클라우드에서 ${assets.length}건의 자산을 불러왔습니다.`, "success");
+          }
+        } else {
+          loadLocalData();
+        }
+      } catch (err) {
+        console.error("Data load exception:", err);
+        loadLocalData();
+      } finally {
+        setLoading(false);
+        render();
+      }
+    }
+
+    function loadLocalData() {
+      const saved = localStorage.getItem(LOCAL_STORAGE_KEY);
       if (saved) {
         try {
           assets = JSON.parse(saved);
         } catch (e) {
-          console.error("Failed to parse stored assets", e);
           assets = [...initialSampleData];
         }
       } else {
         assets = [...initialSampleData];
-        saveData();
+        saveLocalData();
       }
     }
 
-    // Save data to LocalStorage
-    function saveData() {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(assets));
-      render();
+    function saveLocalData() {
+      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(assets));
     }
 
-    // UI Badges Helper
+    // ==========================================
+    // CRUD Operations (Supabase or Local)
+    // ==========================================
+    async function handleSaveAsset(assetData, editId) {
+      setLoading(true);
+      try {
+        if (supabaseClient) {
+          if (editId) {
+            // Update
+            const { error } = await supabaseClient
+              .from('assets')
+              .update(assetData)
+              .eq('id', editId);
+            if (error) throw error;
+            showToast(`자산(${assetData.code})이 Supabase에 수정되었습니다.`, "success");
+          } else {
+            // Insert
+            const { error } = await supabaseClient
+              .from('assets')
+              .insert([assetData]);
+            if (error) throw error;
+            showToast(`새 자산(${assetData.code})이 Supabase에 등록되었습니다.`, "success");
+          }
+        } else {
+          // Local fallback
+          if (editId) {
+            const index = assets.findIndex(a => a.id === editId);
+            if (index !== -1) {
+              assets[index] = { ...assets[index], ...assetData };
+            }
+          } else {
+            const newItem = {
+              id: "ast-" + Date.now() + "-" + Math.random().toString(36).substr(2, 5),
+              ...assetData
+            };
+            assets.unshift(newItem);
+          }
+          saveLocalData();
+          showToast(`자산 정보가 로컬 저장소에 저장되었습니다.`, "success");
+        }
+        await loadData();
+        return true;
+      } catch (err) {
+        console.error("Save asset failed:", err);
+        showToast(`저장 오류: ${err.message}`, "error");
+        return false;
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    async function handleDeleteAsset(id) {
+      setLoading(true);
+      try {
+        if (supabaseClient) {
+          const { error } = await supabaseClient
+            .from('assets')
+            .delete()
+            .eq('id', id);
+          if (error) throw error;
+          showToast("자산이 Supabase 클라우드에서 삭제되었습니다.", "success");
+        } else {
+          assets = assets.filter(a => a.id !== id);
+          saveLocalData();
+          showToast("자산이 로컬 저장소에서 삭제되었습니다.", "success");
+        }
+        selectedAssetIds.delete(id);
+        await loadData();
+      } catch (err) {
+        console.error("Delete asset failed:", err);
+        showToast(`삭제 실패: ${err.message}`, "error");
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    async function handleBatchDelete() {
+      if (selectedAssetIds.size === 0) return;
+      if (!confirm(`선택한 ${selectedAssetIds.size}건의 자산을 완전히 삭제하시겠습니까?`)) return;
+
+      setLoading(true);
+      const idsToDelete = Array.from(selectedAssetIds);
+      try {
+        if (supabaseClient) {
+          const { error } = await supabaseClient
+            .from('assets')
+            .delete()
+            .in('id', idsToDelete);
+          if (error) throw error;
+          showToast(`${idsToDelete.length}건이 Supabase에서 일괄 삭제되었습니다.`, "success");
+        } else {
+          assets = assets.filter(a => !selectedAssetIds.has(a.id));
+          saveLocalData();
+          showToast(`${idsToDelete.length}건이 로컬 저장소에서 일괄 삭제되었습니다.`, "success");
+        }
+        selectedAssetIds.clear();
+        await loadData();
+      } catch (err) {
+        console.error("Batch delete failed:", err);
+        showToast(`일괄 삭제 실패: ${err.message}`, "error");
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    // ==========================================
+    // UI Helpers & Badges
+    // ==========================================
     function getStatusBadge(status) {
       switch (status) {
         case "사용중":
@@ -679,12 +1028,11 @@
       return `<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium border ${cls}">${category}</span>`;
     }
 
-    // Number formatting
     function formatMoney(amount) {
       return (Number(amount) || 0).toLocaleString('ko-KR');
     }
 
-    // Render KPI Cards
+    // Render KPIs
     function renderKPIs() {
       const totalCount = assets.length;
       const totalQty = assets.reduce((sum, item) => sum + (Number(item.quantity) || 1), 0);
@@ -707,7 +1055,7 @@
 
     // Render Charts
     function renderCharts() {
-      // 1. Department Chart (Pie/Doughnut)
+      // 1. Department Chart
       const deptCounts = {};
       assets.forEach(a => {
         const d = a.department || "기타";
@@ -745,7 +1093,7 @@
         }
       });
 
-      // 2. Category Values (Bar)
+      // 2. Category Chart
       const catValues = {};
       assets.forEach(a => {
         const cat = a.category || "기타비품";
@@ -821,7 +1169,6 @@
         return matchesQuery && matchesCat && matchesDept && matchesStatus;
       });
 
-      // Sort
       filtered.sort((a, b) => {
         let valA, valB;
         if (currentSort.column === 'code') {
@@ -920,12 +1267,10 @@
         tbody.innerHTML = html;
       }
 
-      // Update Select All Checkbox state
       const selectAll = document.getElementById("selectAllCheckbox");
       const currentIds = list.map(i => i.id);
       selectAll.checked = currentIds.length > 0 && currentIds.every(id => selectedAssetIds.has(id));
 
-      // Batch Delete Button Visibility
       if (selectedAssetIds.size > 0) {
         btnBatchDelete.classList.remove("hidden");
         selectedCountEl.innerText = selectedAssetIds.size;
@@ -1005,7 +1350,6 @@
       document.getElementById("formCode").value = `${prefix}-${year}-${formattedNum}`;
     }
 
-    // Detail Modal
     function showDetail(id) {
       const item = assets.find(a => a.id === id);
       if (!item) return;
@@ -1042,25 +1386,125 @@
       document.getElementById("detailModal").classList.add("hidden");
     }
 
-    // Delete handlers
     function deleteSingleAsset(id) {
       const item = assets.find(a => a.id === id);
       if (!item) return;
       if (confirm(`'${item.name} (${item.code})' 자산을 정말 삭제하시겠습니까?`)) {
-        assets = assets.filter(a => a.id !== id);
-        selectedAssetIds.delete(id);
-        saveData();
+        handleDeleteAsset(id);
       }
     }
 
-    // Excel Export
+    // ==========================================
+    // Supabase Settings Modal Handlers
+    // ==========================================
+    const supabaseModal = document.getElementById("supabaseModal");
+    function openSupabaseModal() {
+      const configStr = localStorage.getItem(SUPABASE_CONFIG_KEY);
+      if (configStr) {
+        try {
+          const cfg = JSON.parse(configStr);
+          document.getElementById("sbProjectUrl").value = cfg.url || "";
+          document.getElementById("sbAnonKey").value = cfg.key || "";
+        } catch (e) {}
+      }
+      supabaseModal.classList.remove("hidden");
+    }
+
+    function closeSupabaseModal() {
+      supabaseModal.classList.add("hidden");
+    }
+
+    async function saveSupabaseConfig() {
+      const url = document.getElementById("sbProjectUrl").value.trim();
+      const key = document.getElementById("sbAnonKey").value.trim();
+
+      if (!url || !key) {
+        alert("Supabase Project URL과 Anon Key를 모두 입력해 주세요.");
+        return;
+      }
+
+      // Test connection
+      try {
+        const testClient = window.supabase.createClient(url, key);
+        const { error } = await testClient.from('assets').select('id').limit(1);
+        if (error) {
+          throw new Error(`연결 실패: ${error.message} (SQL 스키마 생성 여부를 확인하세요)`);
+        }
+
+        // Save
+        localStorage.setItem(SUPABASE_CONFIG_KEY, JSON.stringify({ url, key }));
+        supabaseClient = testClient;
+        updateDbStatusUI(true, url);
+        showToast("Supabase 데이터베이스에 성공적으로 연결되었습니다!", "success");
+        closeSupabaseModal();
+        await loadData();
+      } catch (err) {
+        alert(`Supabase 연결 테스트 오류:\n${err.message}`);
+      }
+    }
+
+    function disconnectSupabase() {
+      if (confirm("Supabase 연결을 해제하고 로컬 브라우저 저장소 모드로 전환하시겠습니까?")) {
+        localStorage.removeItem(SUPABASE_CONFIG_KEY);
+        supabaseClient = null;
+        updateDbStatusUI(false);
+        showToast("로컬 브라우저 모드로 전환되었습니다.", "info");
+        closeSupabaseModal();
+        loadData();
+      }
+    }
+
+    async function syncLocalToSupabase() {
+      if (!supabaseClient) {
+        alert("Supabase가 연결되어 있지 않습니다.");
+        return;
+      }
+      if (!confirm(`현재 로컬에 저장된 ${assets.length}건의 데이터를 Supabase 클라우드로 일괄 업로드하시겠습니까?`)) return;
+
+      setLoading(true);
+      try {
+        // Clean IDs for UUID compatibility if needed
+        const payload = assets.map(item => {
+          const row = {
+            code: item.code,
+            name: item.name,
+            category: item.category,
+            date: item.date,
+            quantity: Number(item.quantity) || 1,
+            price: Number(item.price) || 0,
+            department: item.department,
+            user: item.user || '',
+            location: item.location || '',
+            status: item.status || '사용중',
+            serial: item.serial || '',
+            remarks: item.remarks || ''
+          };
+          return row;
+        });
+
+        const { error } = await supabaseClient.from('assets').upsert(payload, { onConflict: 'code' });
+        if (error) throw error;
+
+        showToast(`성공적으로 ${payload.length}건이 Supabase로 동기화되었습니다!`, "success");
+        closeSupabaseModal();
+        await loadData();
+      } catch (err) {
+        console.error("Sync to Supabase failed:", err);
+        alert(`클라우드 동기화 실패:\n${err.message}`);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    // ==========================================
+    // Excel Export & Import
+    // ==========================================
     function exportToExcel() {
       if (assets.length === 0) {
         alert("내보낼 자산 데이터가 없습니다.");
         return;
       }
 
-      // Map to Korean Headers
       const exportData = assets.map((item, index) => {
         const qty = Number(item.quantity) || 1;
         const price = Number(item.price) || 0;
@@ -1082,46 +1526,26 @@
         };
       });
 
-      // Create Worksheet
       const ws = XLSX.utils.json_to_sheet(exportData);
-
-      // Auto Column Widths
       const colWidths = [
-        { wch: 6 },  // 연번
-        { wch: 18 }, // 자산코드
-        { wch: 28 }, // 자산명
-        { wch: 12 }, // 카테고리
-        { wch: 12 }, // 취득일자
-        { wch: 8 },  // 수량
-        { wch: 14 }, // 취득단가
-        { wch: 16 }, // 취득가액합계
-        { wch: 14 }, // 관리부서
-        { wch: 14 }, // 실사용자
-        { wch: 22 }, // 보관위치
-        { wch: 12 }, // 자산상태
-        { wch: 20 }, // 시리얼번호
-        { wch: 30 }  // 비고
+        { wch: 6 },  { wch: 18 }, { wch: 28 }, { wch: 12 }, { wch: 12 },
+        { wch: 8 },  { wch: 14 }, { wch: 16 }, { wch: 14 }, { wch: 14 },
+        { wch: 22 }, { wch: 12 }, { wch: 20 }, { wch: 30 }
       ];
       ws['!cols'] = colWidths;
 
-      // Create Workbook
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, "고정자산관리대장");
-
-      // Generate filename with date
       const today = new Date().toISOString().slice(0, 10).replace(/-/g, '');
-      const fileName = `고정자산관리대장_${today}.xlsx`;
-
-      XLSX.writeFile(wb, fileName);
+      XLSX.writeFile(wb, `고정자산관리대장_${today}.xlsx`);
     }
 
-    // Excel Import
-    function handleExcelImport(event) {
+    async function handleExcelImport(event) {
       const file = event.target.files[0];
       if (!file) return;
 
       const reader = new FileReader();
-      reader.onload = function(e) {
+      reader.onload = async function(e) {
         try {
           const data = new Uint8Array(e.target.result);
           const workbook = XLSX.read(data, { type: 'array' });
@@ -1134,12 +1558,11 @@
             return;
           }
 
-          let addedCount = 0;
+          let addedItems = [];
           json.forEach(row => {
-            // Find fields by Korean or English names
             const code = row["자산코드"] || row["코드"] || row["code"] || `AST-${Date.now()}-${Math.floor(Math.random()*1000)}`;
             const name = row["자산명(품명)"] || row["자산명"] || row["품명"] || row["name"];
-            if (!name) return; // skip row without name
+            if (!name) return;
 
             const category = row["카테고리"] || row["분류"] || row["category"] || "기타비품";
             const date = row["취득일자"] || row["구입일자"] || row["date"] || new Date().toISOString().split('T')[0];
@@ -1152,8 +1575,7 @@
             const serial = row["시리얼번호"] || row["S/N"] || row["serial"] || "";
             const remarks = row["비고/메모"] || row["비고"] || row["메모"] || row["remarks"] || "";
 
-            assets.push({
-              id: "ast-" + Date.now() + "-" + Math.random().toString(36).substr(2, 5),
+            addedItems.push({
               code: String(code),
               name: String(name),
               category: String(category),
@@ -1167,42 +1589,65 @@
               serial: String(serial),
               remarks: String(remarks)
             });
-            addedCount++;
           });
 
-          saveData();
-          alert(`엑셀 파일에서 총 ${addedCount}건의 자산 정보를 성공적으로 가져왔습니다.`);
+          if (supabaseClient) {
+            setLoading(true);
+            const { error } = await supabaseClient.from('assets').upsert(addedItems, { onConflict: 'code' });
+            if (error) throw error;
+            showToast(`Supabase 클라우드에 ${addedItems.length}건의 자산이 일괄 등록되었습니다!`, "success");
+          } else {
+            addedItems.forEach(item => {
+              item.id = "ast-" + Date.now() + "-" + Math.random().toString(36).substr(2, 5);
+              assets.unshift(item);
+            });
+            saveLocalData();
+            showToast(`로컬 저장소에 ${addedItems.length}건이 등록되었습니다.`, "success");
+          }
+
           event.target.value = "";
+          await loadData();
         } catch (err) {
           console.error(err);
-          alert("엑셀 파일을 읽는 도중 오류가 발생했습니다. 올바른 형식인지 확인해주세요.");
+          alert(`엑셀 파일 읽기 오류:\n${err.message}`);
+        } finally {
+          setLoading(false);
         }
       };
       reader.readAsArrayBuffer(file);
     }
 
+    // ==========================================
     // Event Listeners
+    // ==========================================
     document.addEventListener("DOMContentLoaded", () => {
+      initSupabase();
       loadData();
-      render();
 
-      // Modal open/close
+      // Supabase Modal
+      document.getElementById("btnOpenSupabaseModal").addEventListener("click", openSupabaseModal);
+      document.getElementById("btnBannerAction").addEventListener("click", openSupabaseModal);
+      document.getElementById("btnCloseSupabaseModal").addEventListener("click", closeSupabaseModal);
+      document.getElementById("btnCancelSbModal").addEventListener("click", closeSupabaseModal);
+      document.getElementById("btnSaveSupabase").addEventListener("click", saveSupabaseConfig);
+      document.getElementById("btnDisconnectSb").addEventListener("click", disconnectSupabase);
+      document.getElementById("btnSyncToCloud").addEventListener("click", syncLocalToSupabase);
+
+      // Asset Modal
       document.getElementById("btnOpenAddModal").addEventListener("click", openAddModal);
       document.getElementById("btnCloseModal").addEventListener("click", closeModal);
       document.getElementById("btnCancelModal").addEventListener("click", closeModal);
       document.getElementById("btnAutoCode").addEventListener("click", autoGenerateCode);
       document.getElementById("formCategory").addEventListener("change", () => {
-        if (!document.getElementById("editAssetId").value) {
-          autoGenerateCode();
-        }
+        if (!document.getElementById("editAssetId").value) autoGenerateCode();
       });
 
-      // Detail Modal Close
+      // Detail Modal
       document.getElementById("btnCloseDetail").addEventListener("click", closeDetailModal);
       document.getElementById("btnCloseDetailBtn").addEventListener("click", closeDetailModal);
 
       // Form Submit
-      assetForm.addEventListener("submit", (e) => {
+      assetForm.addEventListener("submit", async (e) => {
         e.preventDefault();
         const editId = document.getElementById("editAssetId").value;
         const assetData = {
@@ -1220,23 +1665,8 @@
           remarks: document.getElementById("formRemarks").value.trim()
         };
 
-        if (editId) {
-          // Update
-          const index = assets.findIndex(a => a.id === editId);
-          if (index !== -1) {
-            assets[index] = { ...assets[index], ...assetData };
-          }
-        } else {
-          // Create
-          const newItem = {
-            id: "ast-" + Date.now() + "-" + Math.random().toString(36).substr(2, 5),
-            ...assetData
-          };
-          assets.unshift(newItem);
-        }
-
-        saveData();
-        closeModal();
+        const success = await handleSaveAsset(assetData, editId);
+        if (success) closeModal();
       });
 
       // Filters & Search
@@ -1251,8 +1681,9 @@
         document.getElementById("filterStatus").value = "ALL";
         renderTable();
       });
+      document.getElementById("btnRefreshData").addEventListener("click", () => loadData());
 
-      // Table Sorting
+      // Sorting
       document.querySelectorAll("th[data-sort]").forEach(th => {
         th.addEventListener("click", () => {
           const col = th.getAttribute("data-sort");
@@ -1266,68 +1697,82 @@
         });
       });
 
-      // Checkbox Selections
+      // Selection
       document.getElementById("selectAllCheckbox").addEventListener("change", (e) => {
         const checked = e.target.checked;
         const currentList = getFilteredAndSortedAssets();
-        if (checked) {
-          currentList.forEach(item => selectedAssetIds.add(item.id));
-        } else {
-          currentList.forEach(item => selectedAssetIds.delete(item.id));
-        }
+        if (checked) currentList.forEach(item => selectedAssetIds.add(item.id));
+        else currentList.forEach(item => selectedAssetIds.delete(item.id));
         renderTable();
       });
 
       document.getElementById("assetTableBody").addEventListener("change", (e) => {
         if (e.target.classList.contains("row-checkbox")) {
           const id = e.target.getAttribute("data-id");
-          if (e.target.checked) {
-            selectedAssetIds.add(id);
-          } else {
-            selectedAssetIds.delete(id);
-          }
+          if (e.target.checked) selectedAssetIds.add(id);
+          else selectedAssetIds.delete(id);
           renderTable();
         }
       });
 
       // Batch Delete
-      document.getElementById("btnBatchDelete").addEventListener("click", () => {
-        if (selectedAssetIds.size === 0) return;
-        if (confirm(`선택한 ${selectedAssetIds.size}건의 자산을 삭제하시겠습니까?`)) {
-          assets = assets.filter(a => !selectedAssetIds.has(a.id));
-          selectedAssetIds.clear();
-          saveData();
-        }
-      });
+      document.getElementById("btnBatchDelete").addEventListener("click", handleBatchDelete);
 
-      // Excel Export & Import
+      // Excel
       document.getElementById("btnExcelExport").addEventListener("click", exportToExcel);
       document.getElementById("excelFileInput").addEventListener("change", handleExcelImport);
 
-      // Samples & Reset
-      const loadSamples = () => {
-        if (confirm("기본 샘플 데이터로 복원하시겠습니까? 기존 데이터에 추가됩니다.")) {
-          assets = [...initialSampleData];
-          selectedAssetIds.clear();
-          saveData();
+      // Samples & Clear
+      const loadSamples = async () => {
+        if (confirm("기본 샘플 데이터 9건을 추가하시겠습니까?")) {
+          if (supabaseClient) {
+            setLoading(true);
+            const { error } = await supabaseClient.from('assets').upsert(initialSampleData.map(s => {
+              const { id, ...rest } = s;
+              return rest;
+            }), { onConflict: 'code' });
+            if (error) {
+              alert(`Supabase 샘플 추가 실패: ${error.message}`);
+            } else {
+              showToast("Supabase에 샘플 데이터 9건이 등록되었습니다.", "success");
+            }
+            await loadData();
+          } else {
+            assets = [...initialSampleData];
+            selectedAssetIds.clear();
+            saveLocalData();
+            render();
+            showToast("로컬 샘플 데이터 9건이 복원되었습니다.", "info");
+          }
         }
       };
+
       document.getElementById("btnLoadSample").addEventListener("click", loadSamples);
       document.getElementById("btnLoadSampleEmpty").addEventListener("click", loadSamples);
 
-      document.getElementById("btnClearAll").addEventListener("click", () => {
-        if (confirm("정말 모든 데이터를 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.")) {
+      document.getElementById("btnClearAll").addEventListener("click", async () => {
+        if (!confirm("정말 모든 데이터를 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.")) return;
+        if (supabaseClient) {
+          setLoading(true);
+          const { error } = await supabaseClient.from('assets').delete().neq('code', '__NONE__');
+          if (error) alert(error.message);
+          else showToast("Supabase 데이터베이스가 초기화되었습니다.", "success");
+          await loadData();
+        } else {
           assets = [];
           selectedAssetIds.clear();
-          saveData();
+          saveLocalData();
+          render();
+          showToast("로컬 데이터가 모두 초기화되었습니다.", "info");
         }
       });
 
-      // Keyboard Esc to close modals
+      // Esc key
       document.addEventListener("keydown", (e) => {
         if (e.key === "Escape") {
           closeModal();
           closeDetailModal();
+          closeSupabaseModal();
         }
       });
     });
