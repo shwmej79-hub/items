@@ -1,0 +1,1336 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>기업 고정자산 및 비품 관리대장</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <!-- SheetJS (xlsx) for Excel Import/Export -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <!-- FontAwesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Pretendard:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    body {
+      font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, Roboto, sans-serif;
+    }
+    .custom-scrollbar::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb {
+      background-color: #cbd5e1;
+      border-radius: 4px;
+    }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-800 antialiased min-h-screen flex flex-col">
+
+  <!-- Top Navigation Bar -->
+  <header class="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-sm">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="flex justify-between items-center h-16">
+        <div class="flex items-center space-x-3">
+          <div class="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center text-white shadow-md shadow-indigo-100">
+            <i class="fa-solid fa-boxes-stacked text-lg"></i>
+          </div>
+          <div>
+            <h1 class="text-lg font-bold text-slate-900 tracking-tight flex items-center gap-2">
+              기업 자산 및 비품 관리대장
+              <span class="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200">v2.0 Pro</span>
+            </h1>
+            <p class="text-xs text-slate-500">고정자산 · IT장비 · 사무비품 통합 전산관리</p>
+          </div>
+        </div>
+
+        <!-- Global Action Buttons -->
+        <div class="flex items-center space-x-2 sm:space-x-3">
+          <button id="btnExcelExport" class="inline-flex items-center px-3.5 py-2 border border-emerald-600 text-xs sm:text-sm font-semibold rounded-lg text-emerald-700 bg-emerald-50 hover:bg-emerald-100 transition shadow-sm">
+            <i class="fa-solid fa-file-excel mr-1.5 text-emerald-600 text-base"></i>
+            엑셀 내보내기
+          </button>
+          <label for="excelFileInput" class="cursor-pointer inline-flex items-center px-3.5 py-2 border border-slate-300 text-xs sm:text-sm font-medium rounded-lg text-slate-700 bg-white hover:bg-slate-50 transition shadow-sm">
+            <i class="fa-solid fa-file-import mr-1.5 text-slate-500"></i>
+            엑셀 불러오기
+            <input type="file" id="excelFileInput" accept=".xlsx, .xls, .csv" class="hidden">
+          </label>
+          <button id="btnOpenAddModal" class="inline-flex items-center px-4 py-2 border border-transparent text-xs sm:text-sm font-semibold rounded-lg text-white bg-indigo-600 hover:bg-indigo-700 transition shadow-md shadow-indigo-100">
+            <i class="fa-solid fa-plus mr-1.5"></i>
+            신규 자산 등록
+          </button>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Content Container -->
+  <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+
+    <!-- KPI Summary Cards -->
+    <section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <!-- Total Assets -->
+      <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm hover:shadow transition">
+        <div class="flex items-center justify-between">
+          <div>
+            <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider">총 자산 수량</p>
+            <h3 id="statTotalCount" class="text-2xl font-bold text-slate-900 mt-1">0<span class="text-sm font-normal text-slate-500 ml-1">개 품목</span></h3>
+          </div>
+          <div class="w-12 h-12 bg-blue-50 text-blue-600 rounded-xl flex items-center justify-center text-xl">
+            <i class="fa-solid fa-layer-group"></i>
+          </div>
+        </div>
+        <div class="mt-3 flex items-center text-xs text-slate-500">
+          <span class="text-blue-600 font-semibold mr-1" id="statTotalQuantity">총 0개 실물</span>
+          <span>보유 관리 중</span>
+        </div>
+      </div>
+
+      <!-- Total Asset Value -->
+      <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm hover:shadow transition">
+        <div class="flex items-center justify-between">
+          <div>
+            <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider">총 취득가액</p>
+            <h3 id="statTotalValue" class="text-2xl font-bold text-slate-900 mt-1">0<span class="text-sm font-normal text-slate-500 ml-1">원</span></h3>
+          </div>
+          <div class="w-12 h-12 bg-emerald-50 text-emerald-600 rounded-xl flex items-center justify-center text-xl">
+            <i class="fa-solid fa-won-sign"></i>
+          </div>
+        </div>
+        <div class="mt-3 flex items-center text-xs text-slate-500">
+          <span>평균 취득단가: </span>
+          <span id="statAvgValue" class="font-semibold text-slate-700 ml-1">0원</span>
+        </div>
+      </div>
+
+      <!-- Active In-Use Assets -->
+      <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm hover:shadow transition">
+        <div class="flex items-center justify-between">
+          <div>
+            <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider">정상 사용중</p>
+            <h3 id="statInUseCount" class="text-2xl font-bold text-indigo-600 mt-1">0<span class="text-sm font-normal text-slate-500 ml-1">건</span></h3>
+          </div>
+          <div class="w-12 h-12 bg-indigo-50 text-indigo-600 rounded-xl flex items-center justify-center text-xl">
+            <i class="fa-solid fa-circle-check"></i>
+          </div>
+        </div>
+        <div class="mt-3 flex items-center text-xs text-slate-500">
+          <span>사용 가동률: </span>
+          <span id="statInUseRate" class="font-semibold text-indigo-600 ml-1">0%</span>
+        </div>
+      </div>
+
+      <!-- Maintenance & Idle Assets -->
+      <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm hover:shadow transition">
+        <div class="flex items-center justify-between">
+          <div>
+            <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider">수리·유휴·폐기</p>
+            <h3 id="statAttentionCount" class="text-2xl font-bold text-amber-600 mt-1">0<span class="text-sm font-normal text-slate-500 ml-1">건</span></h3>
+          </div>
+          <div class="w-12 h-12 bg-amber-50 text-amber-600 rounded-xl flex items-center justify-center text-xl">
+            <i class="fa-solid fa-triangle-exclamation"></i>
+          </div>
+        </div>
+        <div class="mt-3 flex items-center text-xs text-slate-500">
+          <span>점검/조치 필요 품목</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- Visual Charts Accordion / Card -->
+    <section class="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
+      <div class="flex items-center justify-between mb-4">
+        <h2 class="text-base font-bold text-slate-800 flex items-center gap-2">
+          <i class="fa-solid fa-chart-pie text-indigo-500"></i> 자산 현황 통계 분석
+        </h2>
+        <span class="text-xs text-slate-400">데이터 실시간 반영</span>
+      </div>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div class="bg-slate-50 p-4 rounded-xl border border-slate-100 flex flex-col items-center">
+          <h3 class="text-xs font-bold text-slate-600 mb-2 uppercase">부서별 자산 수량 분포</h3>
+          <div class="relative w-full max-w-[280px] h-60">
+            <canvas id="deptChart"></canvas>
+          </div>
+        </div>
+        <div class="bg-slate-50 p-4 rounded-xl border border-slate-100 flex flex-col items-center">
+          <h3 class="text-xs font-bold text-slate-600 mb-2 uppercase">카테고리별 자산 취득금액 합계</h3>
+          <div class="relative w-full h-60">
+            <canvas id="categoryChart"></canvas>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Filters, Search & Table Operations -->
+    <section class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+      <!-- Toolbar -->
+      <div class="p-4 border-b border-slate-100 space-y-3">
+        <div class="flex flex-col md:flex-row md:items-center justify-between gap-3">
+          <!-- Search Box -->
+          <div class="relative flex-1 max-w-md">
+            <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-sm"></i>
+            <input type="text" id="searchInput" placeholder="자산코드, 자산명, 실사용자, 시리얼, 위치 검색..."
+              class="w-full pl-10 pr-4 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-slate-50/50">
+          </div>
+
+          <!-- Quick Filters & Batch Actions -->
+          <div class="flex flex-wrap items-center gap-2">
+            <!-- Category Filter -->
+            <select id="filterCategory" class="text-xs sm:text-sm border border-slate-200 rounded-lg px-3 py-2 bg-white text-slate-700 focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+              <option value="ALL">전체 카테고리</option>
+              <option value="IT기기">IT기기 (노트북/PC/모니터)</option>
+              <option value="사무가구">사무가구 (책상/의자/수납장)</option>
+              <option value="전자제품">전자제품 (냉장고/공청기 등)</option>
+              <option value="차량운반구">차량운반구 (업무용 차량)</option>
+              <option value="기타비품">기타비품</option>
+            </select>
+
+            <!-- Department Filter -->
+            <select id="filterDepartment" class="text-xs sm:text-sm border border-slate-200 rounded-lg px-3 py-2 bg-white text-slate-700 focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+              <option value="ALL">전체 부서</option>
+              <option value="경영지원팀">경영지원팀</option>
+              <option value="개발팀">개발팀</option>
+              <option value="디자인팀">디자인팀</option>
+              <option value="마케팅팀">마케팅팀</option>
+              <option value="영업팀">영업팀</option>
+              <option value="공용/총무">공용/총무</option>
+            </select>
+
+            <!-- Status Filter -->
+            <select id="filterStatus" class="text-xs sm:text-sm border border-slate-200 rounded-lg px-3 py-2 bg-white text-slate-700 focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+              <option value="ALL">전체 상태</option>
+              <option value="사용중">사용중</option>
+              <option value="유휴(보관)">유휴(보관)</option>
+              <option value="수리중">수리중</option>
+              <option value="폐기예정">폐기예정</option>
+              <option value="폐기">폐기</option>
+            </select>
+
+            <!-- Batch Delete Button (Hidden by default) -->
+            <button id="btnBatchDelete" class="hidden inline-flex items-center px-3 py-2 border border-rose-300 text-xs sm:text-sm font-semibold rounded-lg text-rose-700 bg-rose-50 hover:bg-rose-100 transition">
+              <i class="fa-solid fa-trash-can mr-1.5"></i>
+              선택 삭제 (<span id="selectedCount">0</span>)
+            </button>
+
+            <!-- Reset Filter Button -->
+            <button id="btnResetFilters" title="필터 초기화" class="p-2 border border-slate-200 rounded-lg text-slate-500 hover:bg-slate-100 transition">
+              <i class="fa-solid fa-arrow-rotate-left"></i>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Table View -->
+      <div class="overflow-x-auto custom-scrollbar">
+        <table class="w-full text-left border-collapse text-sm">
+          <thead>
+            <tr class="bg-slate-100/70 border-b border-slate-200 text-slate-600 font-semibold text-xs tracking-wider">
+              <th class="p-3.5 text-center w-10">
+                <input type="checkbox" id="selectAllCheckbox" class="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500">
+              </th>
+              <th class="p-3.5 whitespace-nowrap cursor-pointer hover:text-indigo-600" data-sort="code">
+                자산코드 <i class="fa-solid fa-sort text-slate-400 text-xs"></i>
+              </th>
+              <th class="p-3.5 whitespace-nowrap cursor-pointer hover:text-indigo-600" data-sort="name">
+                자산명 <i class="fa-solid fa-sort text-slate-400 text-xs"></i>
+              </th>
+              <th class="p-3.5 whitespace-nowrap">분류</th>
+              <th class="p-3.5 whitespace-nowrap cursor-pointer hover:text-indigo-600 text-right" data-sort="price">
+                취득가액(수량) <i class="fa-solid fa-sort text-slate-400 text-xs"></i>
+              </th>
+              <th class="p-3.5 whitespace-nowrap cursor-pointer hover:text-indigo-600" data-sort="date">
+                취득일자 <i class="fa-solid fa-sort text-slate-400 text-xs"></i>
+              </th>
+              <th class="p-3.5 whitespace-nowrap">관리부서 / 실사용자</th>
+              <th class="p-3.5 whitespace-nowrap">보관위치</th>
+              <th class="p-3.5 whitespace-nowrap text-center">상태</th>
+              <th class="p-3.5 whitespace-nowrap text-center w-28">관리</th>
+            </tr>
+          </thead>
+          <tbody id="assetTableBody" class="divide-y divide-slate-200 bg-white">
+            <!-- Dynamic Rows will be inserted here -->
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Empty State / Pagination Info -->
+      <div id="emptyState" class="hidden py-16 text-center">
+        <div class="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mx-auto text-slate-400 text-2xl mb-3">
+          <i class="fa-solid fa-inbox"></i>
+        </div>
+        <p class="text-base font-semibold text-slate-700">등록된 자산이 없습니다</p>
+        <p class="text-xs text-slate-500 mt-1">새 자산을 등록하거나 샘플 데이터를 불러와보세요.</p>
+        <button id="btnLoadSampleEmpty" class="mt-4 px-4 py-2 text-xs font-semibold rounded-lg bg-indigo-50 text-indigo-600 border border-indigo-200 hover:bg-indigo-100">
+          샘플 데이터 10건 채우기
+        </button>
+      </div>
+
+      <!-- Table Footer / Count -->
+      <div class="px-4 py-3 bg-slate-50 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between text-xs text-slate-500 gap-2">
+        <div>
+          표시 중인 자산: <span id="filteredCount" class="font-bold text-slate-700">0</span>건 (전체 <span id="totalDbCount">0</span>건)
+        </div>
+        <div class="flex items-center space-x-2">
+          <button id="btnLoadSample" class="text-indigo-600 hover:underline">
+            <i class="fa-solid fa-wand-magic-sparkles mr-1"></i>샘플 데이터 복원
+          </button>
+          <span>|</span>
+          <button id="btnClearAll" class="text-rose-600 hover:underline">
+            <i class="fa-solid fa-trash mr-1"></i>전체 데이터 초기화
+          </button>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- Asset Form Modal (Add / Edit) -->
+  <div id="assetModal" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm hidden overflow-y-auto p-4">
+    <div class="bg-white rounded-2xl max-w-2xl w-full shadow-2xl border border-slate-200 overflow-hidden my-8 transform transition-all">
+      <div class="px-6 py-4 bg-slate-50 border-b border-slate-200 flex justify-between items-center">
+        <h3 id="modalTitle" class="text-base font-bold text-slate-900 flex items-center gap-2">
+          <i class="fa-solid fa-box-open text-indigo-600"></i>
+          신규 자산 등록
+        </h3>
+        <button id="btnCloseModal" class="text-slate-400 hover:text-slate-600 text-lg">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <form id="assetForm" class="p-6 space-y-4">
+        <input type="hidden" id="editAssetId">
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <!-- Asset Code -->
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">
+              자산관리코드 <span class="text-rose-500">*</span>
+            </label>
+            <div class="flex gap-2">
+              <input type="text" id="formCode" required placeholder="예: AST-2024-001"
+                class="flex-1 px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+              <button type="button" id="btnAutoCode" class="px-2.5 py-2 text-xs font-medium bg-slate-100 hover:bg-slate-200 border border-slate-300 rounded-lg text-slate-700 whitespace-nowrap">
+                자동생성
+              </button>
+            </div>
+          </div>
+
+          <!-- Asset Name -->
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">
+              자산명 (품명) <span class="text-rose-500">*</span>
+            </label>
+            <input type="text" id="formName" required placeholder="예: MacBook Pro 16인치 M3"
+              class="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+          </div>
+
+          <!-- Category -->
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">
+              분류 (카테고리) <span class="text-rose-500">*</span>
+            </label>
+            <select id="formCategory" required class="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none bg-white">
+              <option value="IT기기">IT기기 (노트북/모니터/PC 등)</option>
+              <option value="사무가구">사무가구 (데스크/체어/서랍장 등)</option>
+              <option value="전자제품">전자제품 (공기청정기/냉장고 등)</option>
+              <option value="차량운반구">차량운반구 (법인차량/운송수단)</option>
+              <option value="기타비품">기타비품</option>
+            </select>
+          </div>
+
+          <!-- Acquisition Date -->
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">
+              취득일자 <span class="text-rose-500">*</span>
+            </label>
+            <input type="date" id="formDate" required
+              class="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+          </div>
+
+          <!-- Quantity -->
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">
+              수량 <span class="text-rose-500">*</span>
+            </label>
+            <input type="number" id="formQuantity" min="1" value="1" required
+              class="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+          </div>
+
+          <!-- Unit Price -->
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">
+              취득단가 (원) <span class="text-rose-500">*</span>
+            </label>
+            <input type="number" id="formPrice" min="0" step="100" placeholder="0" required
+              class="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+          </div>
+
+          <!-- Department -->
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">
+              관리부서 <span class="text-rose-500">*</span>
+            </label>
+            <input type="text" id="formDepartment" required placeholder="예: 개발팀, 경영지원팀" list="deptSuggestions"
+              class="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+            <datalist id="deptSuggestions">
+              <option value="경영지원팀">
+              <option value="개발팀">
+              <option value="디자인팀">
+              <option value="마케팅팀">
+              <option value="영업팀">
+              <option value="공용/총무">
+            </datalist>
+          </div>
+
+          <!-- User / Responsible Person -->
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">
+              실사용자 / 담당자
+            </label>
+            <input type="text" id="formUser" placeholder="예: 홍길동 (공용인 경우 공용 입력)"
+              class="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+          </div>
+
+          <!-- Location -->
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">
+              보관 및 설치위치
+            </label>
+            <input type="text" id="formLocation" placeholder="예: 본사 4층 개발룸 좌석 12"
+              class="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+          </div>
+
+          <!-- Status -->
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">
+              자산 상태 <span class="text-rose-500">*</span>
+            </label>
+            <select id="formStatus" required class="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none bg-white">
+              <option value="사용중">사용중 (정상 운용)</option>
+              <option value="유휴(보관)">유휴(보관) (미배정 재고)</option>
+              <option value="수리중">수리중 (A/S 점검)</option>
+              <option value="폐기예정">폐기예정 (내구연한 만료)</option>
+              <option value="폐기">폐기 (불용 처리)</option>
+            </select>
+          </div>
+
+          <!-- Model / Serial Number -->
+          <div class="sm:col-span-2">
+            <label class="block text-xs font-semibold text-slate-700 mb-1">
+              모델명 / 시리얼번호(S/N)
+            </label>
+            <input type="text" id="formSerial" placeholder="예: Model: A2780, S/N: C02X8890MD6R"
+              class="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+          </div>
+
+          <!-- Note / Remarks -->
+          <div class="sm:col-span-2">
+            <label class="block text-xs font-semibold text-slate-700 mb-1">
+              비고 및 관리 메모
+            </label>
+            <textarea id="formRemarks" rows="2" placeholder="구입처, 보증 만료일자(Warranty), 특이사항 등을 기록하세요."
+              class="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none"></textarea>
+          </div>
+        </div>
+
+        <div class="pt-4 border-t border-slate-200 flex justify-end space-x-3">
+          <button type="button" id="btnCancelModal" class="px-4 py-2 border border-slate-300 text-sm font-medium rounded-lg text-slate-700 hover:bg-slate-50 transition">
+            취소
+          </button>
+          <button type="submit" class="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-sm font-semibold rounded-lg text-white shadow-md shadow-indigo-100 transition">
+            저장하기
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Detail Modal -->
+  <div id="detailModal" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm hidden p-4">
+    <div class="bg-white rounded-2xl max-w-lg w-full shadow-2xl border border-slate-200 overflow-hidden transform transition-all">
+      <div class="px-6 py-4 bg-slate-50 border-b border-slate-200 flex justify-between items-center">
+        <h3 class="text-base font-bold text-slate-900 flex items-center gap-2">
+          <i class="fa-solid fa-circle-info text-indigo-600"></i> 자산 상세 정보
+        </h3>
+        <button id="btnCloseDetail" class="text-slate-400 hover:text-slate-600 text-lg">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+      <div id="detailContent" class="p-6 space-y-3 text-sm">
+        <!-- Content inserted dynamically -->
+      </div>
+      <div class="px-6 py-3 bg-slate-50 border-t border-slate-200 flex justify-end">
+        <button id="btnCloseDetailBtn" class="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 text-sm font-medium rounded-lg">
+          닫기
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <footer class="bg-white border-t border-slate-200 py-4 mt-auto">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between text-xs text-slate-400 gap-2">
+      <p>© 기업 고정자산 관리대장 시스템 · 브라우저 로컬 스토리지에 안전하게 자동 저장됩니다.</p>
+      <p>단축키: <kbd class="px-1.5 py-0.5 bg-slate-100 border border-slate-300 rounded text-slate-600">Esc</kbd> 창 닫기</p>
+    </div>
+  </footer>
+
+  <!-- Application Logic -->
+  <script>
+    // Initial Sample Dataset
+    const initialSampleData = [
+      {
+        id: "ast-1",
+        code: "AST-IT-2024-001",
+        name: "MacBook Pro 16인치 M3 Pro",
+        category: "IT기기",
+        date: "2024-01-15",
+        quantity: 1,
+        price: 3490000,
+        department: "개발팀",
+        user: "김민수 수석",
+        location: "본사 5층 개발실 A-12",
+        status: "사용중",
+        serial: "C02G99A0MD6R",
+        remarks: "애플케어 플러스 가입 (2027-01 만료)"
+      },
+      {
+        id: "ast-2",
+        code: "AST-IT-2024-002",
+        name: "Dell UltraSharp 32인치 4K 모니터",
+        category: "IT기기",
+        date: "2024-01-20",
+        quantity: 2,
+        price: 950000,
+        department: "디자인팀",
+        user: "이서연 팀장",
+        location: "본사 4층 디자인스튜디오",
+        status: "사용중",
+        serial: "CN-0R289D-74445",
+        remarks: "듀얼 모니터 구성용"
+      },
+      {
+        id: "ast-3",
+        code: "AST-FUR-2023-015",
+        name: "허먼밀러 에어론 체어 B사이즈",
+        category: "사무가구",
+        date: "2023-08-10",
+        quantity: 5,
+        price: 1850000,
+        department: "경영지원팀",
+        user: "임원실 및 총무팀",
+        location: "본사 6층 임원실",
+        status: "사용중",
+        serial: "HM-AER-202308",
+        remarks: "12년 본사 보증 품목"
+      },
+      {
+        id: "ast-4",
+        code: "AST-IT-2023-088",
+        name: "LG 그램 15인치 업무용 노트북",
+        category: "IT기기",
+        date: "2023-05-12",
+        quantity: 1,
+        price: 1650000,
+        department: "영업팀",
+        user: "박준혁 과장",
+        location: "영업본부 외근용",
+        status: "수리중",
+        serial: "LG15Z90R-GA56K",
+        remarks: "액정 패널 교체 AS 접수 진행 중 (LG서비스센터)"
+      },
+      {
+        id: "ast-5",
+        code: "AST-ELC-2023-004",
+        name: "삼성 비스포크 공기청정기 큐브",
+        category: "전자제품",
+        date: "2023-03-02",
+        quantity: 3,
+        price: 680000,
+        department: "공용/총무",
+        user: "사옥 공용",
+        location: "대회의실 및 라운지",
+        status: "사용중",
+        serial: "AX53A9310GGD",
+        remarks: "필터 교체 주기: 매년 4월"
+      },
+      {
+        id: "ast-6",
+        code: "AST-FUR-2022-042",
+        name: "데스커 전동 모션데스크 1600",
+        category: "사무가구",
+        date: "2022-11-05",
+        quantity: 1,
+        price: 520000,
+        department: "개발팀",
+        user: "미배정",
+        location: "지하 1층 창고",
+        status: "유휴(보관)",
+        serial: "DSK-MD-1600W",
+        remarks: "신규 입사자 배정 대기 중"
+      },
+      {
+        id: "ast-7",
+        code: "AST-CAR-2022-001",
+        name: "현대 아이오닉5 전기차 (법인업무용)",
+        category: "차량운반구",
+        date: "2022-06-18",
+        quantity: 1,
+        price: 54000000,
+        department: "경영지원팀",
+        user: "법인 공용 (운행일지 작성)",
+        location: "사옥 지하 2층 전용주차구역",
+        status: "사용중",
+        serial: "123가 4567",
+        remarks: "완속충전기 등록 차량, 매년 6월 종합보험 갱신"
+      },
+      {
+        id: "ast-8",
+        code: "AST-IT-2021-030",
+        name: "HP 레이저 복합기 MFP-E82660",
+        category: "IT기기",
+        date: "2021-09-01",
+        quantity: 1,
+        price: 3200000,
+        department: "공용/총무",
+        user: "전사 공용",
+        location: "본사 4층 복사실",
+        status: "사용중",
+        serial: "HPE82660-KR003",
+        remarks: "월 렌탈 유지보수 계약 체결"
+      },
+      {
+        id: "ast-9",
+        code: "AST-IT-2020-011",
+        name: "구형 데스크톱 PC 본체 (i5-8세대)",
+        category: "IT기기",
+        date: "2020-04-10",
+        quantity: 2,
+        price: 850000,
+        department: "개발팀",
+        user: "불용자산",
+        location: "지하 1층 창고 폐기구역",
+        status: "폐기예정",
+        serial: "SYS-OLD-2020-01",
+        remarks: "내구연한 경과 및 저장장치 디가우징 후 폐기 진행 예정"
+      }
+    ];
+
+    // State
+    const STORAGE_KEY = "COMPANY_ASSET_MANAGER_V2";
+    let assets = [];
+    let currentSort = { column: "date", asc: false };
+    let selectedAssetIds = new Set();
+    let deptChart = null;
+    let categoryChart = null;
+
+    // Load data from LocalStorage
+    function loadData() {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved) {
+        try {
+          assets = JSON.parse(saved);
+        } catch (e) {
+          console.error("Failed to parse stored assets", e);
+          assets = [...initialSampleData];
+        }
+      } else {
+        assets = [...initialSampleData];
+        saveData();
+      }
+    }
+
+    // Save data to LocalStorage
+    function saveData() {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(assets));
+      render();
+    }
+
+    // UI Badges Helper
+    function getStatusBadge(status) {
+      switch (status) {
+        case "사용중":
+          return `<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800"><span class="w-1.5 h-1.5 rounded-full bg-emerald-500 mr-1.5"></span>사용중</span>`;
+        case "유휴(보관)":
+          return `<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-blue-100 text-blue-800"><span class="w-1.5 h-1.5 rounded-full bg-blue-500 mr-1.5"></span>유휴(보관)</span>`;
+        case "수리중":
+          return `<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-800"><span class="w-1.5 h-1.5 rounded-full bg-amber-500 mr-1.5"></span>수리중</span>`;
+        case "폐기예정":
+          return `<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-orange-100 text-orange-800"><span class="w-1.5 h-1.5 rounded-full bg-orange-500 mr-1.5"></span>폐기예정</span>`;
+        case "폐기":
+          return `<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-slate-200 text-slate-700"><span class="w-1.5 h-1.5 rounded-full bg-slate-500 mr-1.5"></span>폐기</span>`;
+        default:
+          return `<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-800">${status}</span>`;
+      }
+    }
+
+    function getCategoryBadge(category) {
+      const colors = {
+        "IT기기": "bg-indigo-50 text-indigo-700 border-indigo-200",
+        "사무가구": "bg-teal-50 text-teal-700 border-teal-200",
+        "전자제품": "bg-cyan-50 text-cyan-700 border-cyan-200",
+        "차량운반구": "bg-purple-50 text-purple-700 border-purple-200",
+        "기타비품": "bg-slate-100 text-slate-700 border-slate-200"
+      };
+      const cls = colors[category] || "bg-slate-50 text-slate-700 border-slate-200";
+      return `<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium border ${cls}">${category}</span>`;
+    }
+
+    // Number formatting
+    function formatMoney(amount) {
+      return (Number(amount) || 0).toLocaleString('ko-KR');
+    }
+
+    // Render KPI Cards
+    function renderKPIs() {
+      const totalCount = assets.length;
+      const totalQty = assets.reduce((sum, item) => sum + (Number(item.quantity) || 1), 0);
+      const totalVal = assets.reduce((sum, item) => sum + ((Number(item.price) || 0) * (Number(item.quantity) || 1)), 0);
+      const inUseCount = assets.filter(item => item.status === "사용중").length;
+      const attentionCount = assets.filter(item => ["수리중", "유휴(보관)", "폐기예정"].includes(item.status)).length;
+      
+      const avgVal = totalQty > 0 ? Math.round(totalVal / totalQty) : 0;
+      const inUseRate = totalCount > 0 ? Math.round((inUseCount / totalCount) * 100) : 0;
+
+      document.getElementById("statTotalCount").innerHTML = `${totalCount}<span class="text-sm font-normal text-slate-500 ml-1">개 품목</span>`;
+      document.getElementById("statTotalQuantity").innerText = `총 ${totalQty}개 실물`;
+      document.getElementById("statTotalValue").innerHTML = `${formatMoney(totalVal)}<span class="text-sm font-normal text-slate-500 ml-1">원</span>`;
+      document.getElementById("statAvgValue").innerText = `${formatMoney(avgVal)}원`;
+      document.getElementById("statInUseCount").innerHTML = `${inUseCount}<span class="text-sm font-normal text-slate-500 ml-1">건</span>`;
+      document.getElementById("statInUseRate").innerText = `${inUseRate}%`;
+      document.getElementById("statAttentionCount").innerHTML = `${attentionCount}<span class="text-sm font-normal text-slate-500 ml-1">건</span>`;
+      document.getElementById("totalDbCount").innerText = totalCount;
+    }
+
+    // Render Charts
+    function renderCharts() {
+      // 1. Department Chart (Pie/Doughnut)
+      const deptCounts = {};
+      assets.forEach(a => {
+        const d = a.department || "기타";
+        deptCounts[d] = (deptCounts[d] || 0) + (Number(a.quantity) || 1);
+      });
+
+      const deptLabels = Object.keys(deptCounts);
+      const deptData = Object.values(deptCounts);
+
+      const ctxDept = document.getElementById('deptChart').getContext('2d');
+      if (deptChart) deptChart.destroy();
+      deptChart = new Chart(ctxDept, {
+        type: 'doughnut',
+        data: {
+          labels: deptLabels,
+          datasets: [{
+            data: deptData,
+            backgroundColor: [
+              '#6366f1', '#06b6d4', '#10b981', '#f59e0b', '#ec4899', '#8b5cf6', '#64748b'
+            ],
+            borderWidth: 2,
+            borderColor: '#ffffff'
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: {
+              position: 'bottom',
+              labels: { boxWidth: 12, font: { size: 11 } }
+            }
+          },
+          cutout: '65%'
+        }
+      });
+
+      // 2. Category Values (Bar)
+      const catValues = {};
+      assets.forEach(a => {
+        const cat = a.category || "기타비품";
+        const total = (Number(a.price) || 0) * (Number(a.quantity) || 1);
+        catValues[cat] = (catValues[cat] || 0) + total;
+      });
+
+      const catLabels = Object.keys(catValues);
+      const catData = Object.values(catValues);
+
+      const ctxCat = document.getElementById('categoryChart').getContext('2d');
+      if (categoryChart) categoryChart.destroy();
+      categoryChart = new Chart(ctxCat, {
+        type: 'bar',
+        data: {
+          labels: catLabels,
+          datasets: [{
+            label: '취득금액 합계 (원)',
+            data: catData,
+            backgroundColor: '#4f46e5',
+            borderRadius: 6
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              callbacks: {
+                label: function(context) {
+                  return formatMoney(context.raw) + ' 원';
+                }
+              }
+            }
+          },
+          scales: {
+            y: {
+              beginAtZero: true,
+              ticks: {
+                callback: function(value) {
+                  if (value >= 100000000) return (value / 100000000).toFixed(1) + '억원';
+                  if (value >= 10000) return (value / 10000).toLocaleString() + '만원';
+                  return value;
+                },
+                font: { size: 10 }
+              }
+            },
+            x: {
+              ticks: { font: { size: 11 } }
+            }
+          }
+        }
+      });
+    }
+
+    // Filter & Sort
+    function getFilteredAndSortedAssets() {
+      const q = document.getElementById("searchInput").value.trim().toLowerCase();
+      const cat = document.getElementById("filterCategory").value;
+      const dept = document.getElementById("filterDepartment").value;
+      const st = document.getElementById("filterStatus").value;
+
+      let filtered = assets.filter(item => {
+        const matchesQuery = !q || [
+          item.code, item.name, item.department, item.user, item.location, item.serial, item.remarks
+        ].some(val => val && val.toLowerCase().includes(q));
+
+        const matchesCat = (cat === "ALL" || item.category === cat);
+        const matchesDept = (dept === "ALL" || item.department === dept);
+        const matchesStatus = (st === "ALL" || item.status === st);
+
+        return matchesQuery && matchesCat && matchesDept && matchesStatus;
+      });
+
+      // Sort
+      filtered.sort((a, b) => {
+        let valA, valB;
+        if (currentSort.column === 'code') {
+          valA = a.code || '';
+          valB = b.code || '';
+          return currentSort.asc ? valA.localeCompare(valB) : valB.localeCompare(valA);
+        } else if (currentSort.column === 'name') {
+          valA = a.name || '';
+          valB = b.name || '';
+          return currentSort.asc ? valA.localeCompare(valB) : valB.localeCompare(valA);
+        } else if (currentSort.column === 'price') {
+          valA = (Number(a.price) || 0) * (Number(a.quantity) || 1);
+          valB = (Number(b.price) || 0) * (Number(b.quantity) || 1);
+          return currentSort.asc ? valA - valB : valB - valA;
+        } else if (currentSort.column === 'date') {
+          valA = a.date || '';
+          valB = b.date || '';
+          return currentSort.asc ? valA.localeCompare(valB) : valB.localeCompare(valA);
+        }
+        return 0;
+      });
+
+      return filtered;
+    }
+
+    // Render Table
+    function renderTable() {
+      const list = getFilteredAndSortedAssets();
+      const tbody = document.getElementById("assetTableBody");
+      const emptyState = document.getElementById("emptyState");
+      const filteredCountEl = document.getElementById("filteredCount");
+      const btnBatchDelete = document.getElementById("btnBatchDelete");
+      const selectedCountEl = document.getElementById("selectedCount");
+
+      filteredCountEl.innerText = list.length;
+
+      if (list.length === 0) {
+        tbody.innerHTML = "";
+        emptyState.classList.remove("hidden");
+      } else {
+        emptyState.classList.add("hidden");
+        let html = "";
+        list.forEach(item => {
+          const totalVal = (Number(item.price) || 0) * (Number(item.quantity) || 1);
+          const isSelected = selectedAssetIds.has(item.id);
+
+          html += `
+            <tr class="hover:bg-slate-50 transition border-b border-slate-100 ${isSelected ? 'bg-indigo-50/50' : ''}">
+              <td class="p-3 text-center">
+                <input type="checkbox" class="row-checkbox rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                  data-id="${item.id}" ${isSelected ? 'checked' : ''}>
+              </td>
+              <td class="p-3 font-mono font-medium text-xs text-indigo-700 whitespace-nowrap">
+                <span class="cursor-pointer hover:underline" onclick="showDetail('${item.id}')">${item.code || '-'}</span>
+              </td>
+              <td class="p-3">
+                <div class="font-medium text-slate-900 cursor-pointer hover:text-indigo-600" onclick="showDetail('${item.id}')">
+                  ${escapeHtml(item.name)}
+                </div>
+                ${item.serial ? `<div class="text-[11px] text-slate-400 font-mono">S/N: ${escapeHtml(item.serial)}</div>` : ''}
+              </td>
+              <td class="p-3 whitespace-nowrap">
+                ${getCategoryBadge(item.category)}
+              </td>
+              <td class="p-3 text-right whitespace-nowrap">
+                <div class="font-semibold text-slate-800">${formatMoney(totalVal)}원</div>
+                <div class="text-[11px] text-slate-400">@ ${formatMoney(item.price)}원 (${item.quantity}개)</div>
+              </td>
+              <td class="p-3 font-mono text-xs text-slate-600 whitespace-nowrap">
+                ${item.date || '-'}
+              </td>
+              <td class="p-3 whitespace-nowrap">
+                <div class="font-medium text-slate-800">${escapeHtml(item.department || '-')}</div>
+                <div class="text-[11px] text-slate-500">${escapeHtml(item.user || '미배정')}</div>
+              </td>
+              <td class="p-3 text-xs text-slate-600 whitespace-nowrap">
+                ${escapeHtml(item.location || '-')}
+              </td>
+              <td class="p-3 text-center whitespace-nowrap">
+                ${getStatusBadge(item.status)}
+              </td>
+              <td class="p-3 text-center whitespace-nowrap space-x-1">
+                <button onclick="showDetail('${item.id}')" title="상세보기" class="p-1.5 text-slate-400 hover:text-indigo-600 rounded">
+                  <i class="fa-solid fa-eye text-xs"></i>
+                </button>
+                <button onclick="openEditModal('${item.id}')" title="수정" class="p-1.5 text-slate-400 hover:text-blue-600 rounded">
+                  <i class="fa-solid fa-pen-to-square text-xs"></i>
+                </button>
+                <button onclick="deleteSingleAsset('${item.id}')" title="삭제" class="p-1.5 text-slate-400 hover:text-rose-600 rounded">
+                  <i class="fa-solid fa-trash-can text-xs"></i>
+                </button>
+              </td>
+            </tr>
+          `;
+        });
+        tbody.innerHTML = html;
+      }
+
+      // Update Select All Checkbox state
+      const selectAll = document.getElementById("selectAllCheckbox");
+      const currentIds = list.map(i => i.id);
+      selectAll.checked = currentIds.length > 0 && currentIds.every(id => selectedAssetIds.has(id));
+
+      // Batch Delete Button Visibility
+      if (selectedAssetIds.size > 0) {
+        btnBatchDelete.classList.remove("hidden");
+        selectedCountEl.innerText = selectedAssetIds.size;
+      } else {
+        btnBatchDelete.classList.add("hidden");
+      }
+    }
+
+    function escapeHtml(text) {
+      if (!text) return "";
+      return String(text)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+    }
+
+    function render() {
+      renderKPIs();
+      renderCharts();
+      renderTable();
+    }
+
+    // Modal Control
+    const assetModal = document.getElementById("assetModal");
+    const assetForm = document.getElementById("assetForm");
+
+    function openAddModal() {
+      assetForm.reset();
+      document.getElementById("editAssetId").value = "";
+      document.getElementById("modalTitle").innerHTML = `<i class="fa-solid fa-box-open text-indigo-600"></i> 신규 자산 등록`;
+      document.getElementById("formDate").value = new Date().toISOString().split('T')[0];
+      document.getElementById("formQuantity").value = 1;
+      document.getElementById("formStatus").value = "사용중";
+      autoGenerateCode();
+      assetModal.classList.remove("hidden");
+    }
+
+    function openEditModal(id) {
+      const item = assets.find(a => a.id === id);
+      if (!item) return;
+
+      document.getElementById("editAssetId").value = item.id;
+      document.getElementById("modalTitle").innerHTML = `<i class="fa-solid fa-pen-to-square text-indigo-600"></i> 자산 정보 수정`;
+      document.getElementById("formCode").value = item.code || "";
+      document.getElementById("formName").value = item.name || "";
+      document.getElementById("formCategory").value = item.category || "IT기기";
+      document.getElementById("formDate").value = item.date || "";
+      document.getElementById("formQuantity").value = item.quantity || 1;
+      document.getElementById("formPrice").value = item.price || 0;
+      document.getElementById("formDepartment").value = item.department || "";
+      document.getElementById("formUser").value = item.user || "";
+      document.getElementById("formLocation").value = item.location || "";
+      document.getElementById("formStatus").value = item.status || "사용중";
+      document.getElementById("formSerial").value = item.serial || "";
+      document.getElementById("formRemarks").value = item.remarks || "";
+
+      assetModal.classList.remove("hidden");
+    }
+
+    function closeModal() {
+      assetModal.classList.add("hidden");
+    }
+
+    function autoGenerateCode() {
+      const year = new Date().getFullYear();
+      const cat = document.getElementById("formCategory").value;
+      let prefix = "AST";
+      if (cat === "IT기기") prefix = "AST-IT";
+      else if (cat === "사무가구") prefix = "AST-FUR";
+      else if (cat === "전자제품") prefix = "AST-ELC";
+      else if (cat === "차량운반구") prefix = "AST-CAR";
+
+      const count = assets.length + 1;
+      const formattedNum = String(count).padStart(3, '0');
+      document.getElementById("formCode").value = `${prefix}-${year}-${formattedNum}`;
+    }
+
+    // Detail Modal
+    function showDetail(id) {
+      const item = assets.find(a => a.id === id);
+      if (!item) return;
+      const totalVal = (Number(item.price) || 0) * (Number(item.quantity) || 1);
+
+      const html = `
+        <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+          <div>
+            <span class="text-xs font-mono text-indigo-600 font-semibold">${item.code || '-'}</span>
+            <h4 class="text-lg font-bold text-slate-900">${escapeHtml(item.name)}</h4>
+          </div>
+          <div>${getStatusBadge(item.status)}</div>
+        </div>
+        <div class="grid grid-cols-2 gap-3 py-2 text-xs">
+          <div><span class="text-slate-400 block">분류</span><span class="font-medium text-slate-800">${item.category}</span></div>
+          <div><span class="text-slate-400 block">취득일자</span><span class="font-medium text-slate-800">${item.date || '-'}</span></div>
+          <div><span class="text-slate-400 block">수량 / 단가</span><span class="font-medium text-slate-800">${item.quantity}개 / ${formatMoney(item.price)}원</span></div>
+          <div><span class="text-slate-400 block">총 취득가액</span><span class="font-bold text-indigo-600">${formatMoney(totalVal)}원</span></div>
+          <div><span class="text-slate-400 block">관리부서</span><span class="font-medium text-slate-800">${escapeHtml(item.department || '-')}</span></div>
+          <div><span class="text-slate-400 block">실사용자</span><span class="font-medium text-slate-800">${escapeHtml(item.user || '미배정')}</span></div>
+          <div class="col-span-2"><span class="text-slate-400 block">보관위치</span><span class="font-medium text-slate-800">${escapeHtml(item.location || '-')}</span></div>
+          <div class="col-span-2"><span class="text-slate-400 block">시리얼번호(S/N)</span><span class="font-mono text-slate-800">${escapeHtml(item.serial || '없음')}</span></div>
+          <div class="col-span-2 bg-slate-50 p-3 rounded-lg border border-slate-100">
+            <span class="text-slate-400 block text-[11px] mb-1 font-semibold">비고 및 관리 메모</span>
+            <p class="text-slate-700 whitespace-pre-wrap">${escapeHtml(item.remarks || '등록된 메모가 없습니다.')}</p>
+          </div>
+        </div>
+      `;
+      document.getElementById("detailContent").innerHTML = html;
+      document.getElementById("detailModal").classList.remove("hidden");
+    }
+
+    function closeDetailModal() {
+      document.getElementById("detailModal").classList.add("hidden");
+    }
+
+    // Delete handlers
+    function deleteSingleAsset(id) {
+      const item = assets.find(a => a.id === id);
+      if (!item) return;
+      if (confirm(`'${item.name} (${item.code})' 자산을 정말 삭제하시겠습니까?`)) {
+        assets = assets.filter(a => a.id !== id);
+        selectedAssetIds.delete(id);
+        saveData();
+      }
+    }
+
+    // Excel Export
+    function exportToExcel() {
+      if (assets.length === 0) {
+        alert("내보낼 자산 데이터가 없습니다.");
+        return;
+      }
+
+      // Map to Korean Headers
+      const exportData = assets.map((item, index) => {
+        const qty = Number(item.quantity) || 1;
+        const price = Number(item.price) || 0;
+        return {
+          "연번": index + 1,
+          "자산코드": item.code || "",
+          "자산명(품명)": item.name || "",
+          "카테고리": item.category || "",
+          "취득일자": item.date || "",
+          "수량": qty,
+          "취득단가": price,
+          "취득가액합계": qty * price,
+          "관리부서": item.department || "",
+          "실사용자": item.user || "",
+          "보관위치": item.location || "",
+          "자산상태": item.status || "",
+          "시리얼번호": item.serial || "",
+          "비고/메모": item.remarks || ""
+        };
+      });
+
+      // Create Worksheet
+      const ws = XLSX.utils.json_to_sheet(exportData);
+
+      // Auto Column Widths
+      const colWidths = [
+        { wch: 6 },  // 연번
+        { wch: 18 }, // 자산코드
+        { wch: 28 }, // 자산명
+        { wch: 12 }, // 카테고리
+        { wch: 12 }, // 취득일자
+        { wch: 8 },  // 수량
+        { wch: 14 }, // 취득단가
+        { wch: 16 }, // 취득가액합계
+        { wch: 14 }, // 관리부서
+        { wch: 14 }, // 실사용자
+        { wch: 22 }, // 보관위치
+        { wch: 12 }, // 자산상태
+        { wch: 20 }, // 시리얼번호
+        { wch: 30 }  // 비고
+      ];
+      ws['!cols'] = colWidths;
+
+      // Create Workbook
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "고정자산관리대장");
+
+      // Generate filename with date
+      const today = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+      const fileName = `고정자산관리대장_${today}.xlsx`;
+
+      XLSX.writeFile(wb, fileName);
+    }
+
+    // Excel Import
+    function handleExcelImport(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        try {
+          const data = new Uint8Array(e.target.result);
+          const workbook = XLSX.read(data, { type: 'array' });
+          const firstSheetName = workbook.SheetNames[0];
+          const worksheet = workbook.Sheets[firstSheetName];
+          const json = XLSX.utils.sheet_to_json(worksheet);
+
+          if (!json || json.length === 0) {
+            alert("가져올 수 있는 유효한 행 데이터가 없습니다.");
+            return;
+          }
+
+          let addedCount = 0;
+          json.forEach(row => {
+            // Find fields by Korean or English names
+            const code = row["자산코드"] || row["코드"] || row["code"] || `AST-${Date.now()}-${Math.floor(Math.random()*1000)}`;
+            const name = row["자산명(품명)"] || row["자산명"] || row["품명"] || row["name"];
+            if (!name) return; // skip row without name
+
+            const category = row["카테고리"] || row["분류"] || row["category"] || "기타비품";
+            const date = row["취득일자"] || row["구입일자"] || row["date"] || new Date().toISOString().split('T')[0];
+            const quantity = Number(row["수량"] || row["quantity"] || 1);
+            const price = Number(row["취득단가"] || row["단가"] || row["price"] || row["취득가액합계"] || 0);
+            const department = row["관리부서"] || row["부서"] || row["department"] || "공용/총무";
+            const user = row["실사용자"] || row["담당자"] || row["user"] || "";
+            const location = row["보관위치"] || row["위치"] || row["location"] || "";
+            const status = row["자산상태"] || row["상태"] || row["status"] || "사용중";
+            const serial = row["시리얼번호"] || row["S/N"] || row["serial"] || "";
+            const remarks = row["비고/메모"] || row["비고"] || row["메모"] || row["remarks"] || "";
+
+            assets.push({
+              id: "ast-" + Date.now() + "-" + Math.random().toString(36).substr(2, 5),
+              code: String(code),
+              name: String(name),
+              category: String(category),
+              date: String(date),
+              quantity: quantity,
+              price: price,
+              department: String(department),
+              user: String(user),
+              location: String(location),
+              status: String(status),
+              serial: String(serial),
+              remarks: String(remarks)
+            });
+            addedCount++;
+          });
+
+          saveData();
+          alert(`엑셀 파일에서 총 ${addedCount}건의 자산 정보를 성공적으로 가져왔습니다.`);
+          event.target.value = "";
+        } catch (err) {
+          console.error(err);
+          alert("엑셀 파일을 읽는 도중 오류가 발생했습니다. 올바른 형식인지 확인해주세요.");
+        }
+      };
+      reader.readAsArrayBuffer(file);
+    }
+
+    // Event Listeners
+    document.addEventListener("DOMContentLoaded", () => {
+      loadData();
+      render();
+
+      // Modal open/close
+      document.getElementById("btnOpenAddModal").addEventListener("click", openAddModal);
+      document.getElementById("btnCloseModal").addEventListener("click", closeModal);
+      document.getElementById("btnCancelModal").addEventListener("click", closeModal);
+      document.getElementById("btnAutoCode").addEventListener("click", autoGenerateCode);
+      document.getElementById("formCategory").addEventListener("change", () => {
+        if (!document.getElementById("editAssetId").value) {
+          autoGenerateCode();
+        }
+      });
+
+      // Detail Modal Close
+      document.getElementById("btnCloseDetail").addEventListener("click", closeDetailModal);
+      document.getElementById("btnCloseDetailBtn").addEventListener("click", closeDetailModal);
+
+      // Form Submit
+      assetForm.addEventListener("submit", (e) => {
+        e.preventDefault();
+        const editId = document.getElementById("editAssetId").value;
+        const assetData = {
+          code: document.getElementById("formCode").value.trim(),
+          name: document.getElementById("formName").value.trim(),
+          category: document.getElementById("formCategory").value,
+          date: document.getElementById("formDate").value,
+          quantity: Number(document.getElementById("formQuantity").value) || 1,
+          price: Number(document.getElementById("formPrice").value) || 0,
+          department: document.getElementById("formDepartment").value.trim(),
+          user: document.getElementById("formUser").value.trim(),
+          location: document.getElementById("formLocation").value.trim(),
+          status: document.getElementById("formStatus").value,
+          serial: document.getElementById("formSerial").value.trim(),
+          remarks: document.getElementById("formRemarks").value.trim()
+        };
+
+        if (editId) {
+          // Update
+          const index = assets.findIndex(a => a.id === editId);
+          if (index !== -1) {
+            assets[index] = { ...assets[index], ...assetData };
+          }
+        } else {
+          // Create
+          const newItem = {
+            id: "ast-" + Date.now() + "-" + Math.random().toString(36).substr(2, 5),
+            ...assetData
+          };
+          assets.unshift(newItem);
+        }
+
+        saveData();
+        closeModal();
+      });
+
+      // Filters & Search
+      document.getElementById("searchInput").addEventListener("input", renderTable);
+      document.getElementById("filterCategory").addEventListener("change", renderTable);
+      document.getElementById("filterDepartment").addEventListener("change", renderTable);
+      document.getElementById("filterStatus").addEventListener("change", renderTable);
+      document.getElementById("btnResetFilters").addEventListener("click", () => {
+        document.getElementById("searchInput").value = "";
+        document.getElementById("filterCategory").value = "ALL";
+        document.getElementById("filterDepartment").value = "ALL";
+        document.getElementById("filterStatus").value = "ALL";
+        renderTable();
+      });
+
+      // Table Sorting
+      document.querySelectorAll("th[data-sort]").forEach(th => {
+        th.addEventListener("click", () => {
+          const col = th.getAttribute("data-sort");
+          if (currentSort.column === col) {
+            currentSort.asc = !currentSort.asc;
+          } else {
+            currentSort.column = col;
+            currentSort.asc = true;
+          }
+          renderTable();
+        });
+      });
+
+      // Checkbox Selections
+      document.getElementById("selectAllCheckbox").addEventListener("change", (e) => {
+        const checked = e.target.checked;
+        const currentList = getFilteredAndSortedAssets();
+        if (checked) {
+          currentList.forEach(item => selectedAssetIds.add(item.id));
+        } else {
+          currentList.forEach(item => selectedAssetIds.delete(item.id));
+        }
+        renderTable();
+      });
+
+      document.getElementById("assetTableBody").addEventListener("change", (e) => {
+        if (e.target.classList.contains("row-checkbox")) {
+          const id = e.target.getAttribute("data-id");
+          if (e.target.checked) {
+            selectedAssetIds.add(id);
+          } else {
+            selectedAssetIds.delete(id);
+          }
+          renderTable();
+        }
+      });
+
+      // Batch Delete
+      document.getElementById("btnBatchDelete").addEventListener("click", () => {
+        if (selectedAssetIds.size === 0) return;
+        if (confirm(`선택한 ${selectedAssetIds.size}건의 자산을 삭제하시겠습니까?`)) {
+          assets = assets.filter(a => !selectedAssetIds.has(a.id));
+          selectedAssetIds.clear();
+          saveData();
+        }
+      });
+
+      // Excel Export & Import
+      document.getElementById("btnExcelExport").addEventListener("click", exportToExcel);
+      document.getElementById("excelFileInput").addEventListener("change", handleExcelImport);
+
+      // Samples & Reset
+      const loadSamples = () => {
+        if (confirm("기본 샘플 데이터로 복원하시겠습니까? 기존 데이터에 추가됩니다.")) {
+          assets = [...initialSampleData];
+          selectedAssetIds.clear();
+          saveData();
+        }
+      };
+      document.getElementById("btnLoadSample").addEventListener("click", loadSamples);
+      document.getElementById("btnLoadSampleEmpty").addEventListener("click", loadSamples);
+
+      document.getElementById("btnClearAll").addEventListener("click", () => {
+        if (confirm("정말 모든 데이터를 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.")) {
+          assets = [];
+          selectedAssetIds.clear();
+          saveData();
+        }
+      });
+
+      // Keyboard Esc to close modals
+      document.addEventListener("keydown", (e) => {
+        if (e.key === "Escape") {
+          closeModal();
+          closeDetailModal();
+        }
+      });
+    });
+  </script>
+</body>
+</html>
